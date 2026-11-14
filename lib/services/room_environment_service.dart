@@ -47,7 +47,6 @@ class RoomEnvironmentService {
         await _ambientPlayer!.startPlayer(
           fromURI: soundPath,
           codec: Codec.mp3,
-          volume: _ambientVolume,
         );
       }
     }

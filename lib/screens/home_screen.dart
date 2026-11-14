@@ -1,4 +1,6 @@
 import 'package:audioroom/screens/profile_screen.dart';
+import 'package:audioroom/services/room_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:audioroom/screens/settings_screen.dart';
 import 'package:audioroom/screens/search_rooms_screen.dart';
 import 'package:audioroom/screens/analytics_screen.dart';
@@ -18,64 +20,44 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Demo data for rooms (now mutable)
-  List<Map<String, dynamic>> rooms = [
-    {
-      "name": "General Discussion",
-      "description": "Open conversation for everyone",
-      "total_participants": 5,
-    },
-    {
-      "name": "Music Chat",
-      "description": "Talk about your favorite music",
-      "total_participants": 3,
-    },
-    {
-      "name": "Study Group",
-      "description": "Collaborative learning session",
-      "total_participants": 8,
-    },
-    {
-      "name": "Tech Talk",
-      "description": "Discuss latest technology trends",
-      "total_participants": 12,
-    },
-    {
-      "name": "Book Club",
-      "description": "Share thoughts about books",
-      "total_participants": 6,
-    },
-    {
-      "name": "Gaming Lounge",
-      "description": "Chat about games and gaming strategies",
-      "total_participants": 15,
-    },
-    {
-      "name": "Language Exchange",
-      "description": "Practice different languages together",
-      "total_participants": 9,
-    },
-    {
-      "name": "Meditation & Mindfulness",
-      "description": "Peaceful space for relaxation",
-      "total_participants": 4,
-    },
-    {
-      "name": "Startup Founders",
-      "description": "Entrepreneurs sharing experiences",
-      "total_participants": 7,
-    },
-    {
-      "name": "Art & Design",
-      "description": "Creative discussions and inspiration",
-      "total_participants": 11,
-    },
-  ];
-  
+  List<Map<String, dynamic>> rooms = [];
+  bool _isLoadingRooms = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRooms();
+  }
+
+  Future<void> _loadRooms() async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('rooms')
+          .select('id,title,description,room_members(count)')
+          .eq('status', 'active')
+          .order('created_at', ascending: false);
+      if (!mounted) return;
+      setState(() {
+        rooms = (rows as List).map<Map<String, dynamic>>((row) {
+          final members = (row['room_members'] as List?) ?? [];
+          final count = members.isEmpty ? 0 : (members.first['count'] as int? ?? 0);
+          return {
+            'id': row['id'],
+            'name': row['title'],
+            'description': row['description'] ?? '',
+            'total_participants': count,
+          };
+        }).toList();
+      });
+    } catch (error) {
+      if (mounted) Get.snackbar('Rooms unavailable', 'Could not load rooms from Supabase.');
+    } finally {
+      if (mounted) setState(() => _isLoadingRooms = false);
+    }
+  }
+
   void _addRoom(Map<String, dynamic> newRoom) {
-    setState(() {
-      rooms.add(newRoom);
-    });
+    _loadRooms();
   }
 
   @override
@@ -149,7 +131,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      body: Padding(
+      body: _isLoadingRooms
+          ? const Center(child: CircularProgressIndicator())
+          : rooms.isEmpty
+              ? const Center(child: Text('No rooms yet. Create the first room.'))
+              : Padding(
         padding: const EdgeInsets.only(top: 8),
         child: ListView.builder(
           itemCount: rooms.length,
@@ -158,20 +144,16 @@ class _HomeScreenState extends State<HomeScreen> {
             return Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: NinjaCard(
-                onTap: () {
-                  // Join the room with advanced chat
-                  Get.to(() => AdvancedChatScreen(
-                    roomName: room["name"],
-                  ));
-                  
-                  Get.snackbar(
-                    "⚡ ROOM ENTERED",
-                    "Welcome to '${room["name"]}' ninja!",
-                    backgroundColor: Colors.green.withOpacity(0.8),
-                    colorText: Colors.white,
-                    icon: Icon(Icons.flash_on, color: Colors.white),
-                    duration: Duration(seconds: 2),
-                  );
+                onTap: () async {
+                  try {
+                    await RoomService.joinRoom(
+                      roomName: room['name'],
+                      description: room['description'],
+                    );
+                    Get.to(() => AdvancedChatScreen(roomName: room['name']));
+                  } catch (error) {
+                    Get.snackbar('Could not join room', error.toString());
+                  }
                 },
                 child: ListTile(
                   leading: NinjaPulseEffect(
@@ -356,6 +338,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         Get.snackbar('Thank you!', 'Your feedback has been sent.', backgroundColor: Colors.green, colorText: Colors.white);
                       },
                     );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.redAccent),
+                  title: Text('Sign out', style: GoogleFonts.orbitron(color: Colors.white)),
+                  onTap: () async {
+                    Get.back();
+                    await Supabase.instance.client.auth.signOut();
                   },
                 ),
               ],

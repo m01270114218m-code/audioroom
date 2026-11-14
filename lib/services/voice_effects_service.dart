@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'dart:math' as Math;
+import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -35,6 +35,10 @@ enum SoundEffect {
 }
 
 class VoiceEffectsService {
+  static double _tanh(double value) {
+    final e = math.exp(2 * value);
+    return (e - 1) / (e + 1);
+  }
   static FlutterSoundRecorder? _recorder;
   static FlutterSoundPlayer? _player;
   static VoiceEffect _currentVoiceEffect = VoiceEffect.none;
@@ -273,7 +277,7 @@ class VoiceEffectsService {
       double sample = samples[i].toDouble();
       
       // Add chorus effect with sine wave modulation
-      double modulation = 0.1 * Math.sin(2 * Math.pi * i / 1000) * _effectIntensity;
+      double modulation = 0.1 * math.sin(2 * math.pi * i / 1000) * _effectIntensity;
       int delayedIndex = (i - (100 + modulation * 50)).round();
       
       if (delayedIndex >= 0 && delayedIndex < samples.length) {
@@ -299,8 +303,8 @@ class VoiceEffectsService {
       // Soft clipping for warmth
       if (normalizedSample.abs() > 0.7) {
         normalizedSample = normalizedSample > 0 ? 
-            0.7 + 0.3 * Math.tanh((normalizedSample - 0.7) * 3) :
-            -0.7 - 0.3 * Math.tanh((-normalizedSample - 0.7) * 3);
+            0.7 + 0.3 * _tanh((normalizedSample - 0.7) * 3) :
+            -0.7 - 0.3 * _tanh((-normalizedSample - 0.7) * 3);
       }
       
       // Add subtle high-frequency roll-off

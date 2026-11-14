@@ -1,90 +1,115 @@
 import 'package:audioroom/screens/home_screen.dart';
-import 'package:audioroom/services/api_service.dart';
-import 'package:audioroom/services/livekit_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:audioroom/models/room.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/room.dart';
+class RoomService {
+  static final SupabaseClient _db = Supabase.instance.client;
 
-class RoomService{
-  
-  static final db = FirebaseFirestore.instance;
-  static final currentUser = FirebaseAuth.instance.currentUser;
-  
-  static Future createRoom({required String roomName, required String description}) async{
+  static String get _userId {
+    final user = _db.auth.currentUser;
+    if (user == null) throw AuthException('Please sign in first.');
+    return user.id;
+  }
 
-    //TODO: Comment this while testing features other than LiveKit to reduce usage
-    await ApiService.createLkRoom(roomName: roomName, metaData: description);
+  static Future createRoom({
+    required String roomName,
+    required String description,
+    bool isPrivate = false,
+  }) async {
+    final room = await _db
+        .from('rooms')
+        .insert({
+          'owner_id': _userId,
+          'title': roomName.trim(),
+          'description': description.trim(),
+          'room_type': isPrivate ? 'private' : 'public',
+          'status': 'active',
+        })
+        .select('id, title, description')
+        .single();
 
-    print("Creating Room on Firebase Firestore");
-    await db.collection('rooms').doc(roomName).set({
-      "name": roomName,
-      "token": "tokentobechanged",
-      "description": description,
-      "total_participants": 99
+    await _db.from('room_members').insert({
+      'room_id': room['id'],
+      'user_id': _userId,
+      'role': 'owner',
+    });
+
+    Get.snackbar(
+      'Room created',
+      'The room is saved. Live voice will be enabled after secure LiveKit token setup.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+    return AudioRoom(
+      name: room['title'] as String,
+      description: (room['description'] ?? '') as String,
+    );
+  }
+
+  static Future deleteRoom({required String roomName}) async {
+    final room = await _db
+        .from('rooms')
+        .select('id')
+        .eq('title', roomName)
+        .eq('owner_id', _userId)
+        .maybeSingle();
+
+    if (room == null) return;
+    await _db.from('rooms').delete().eq('id', room['id']);
+    Get.offAll(() => HomeScreen());
+  }
+
+  static Future joinRoom({
+    required String roomName,
+    required String description,
+  }) async {
+    final room = await _db
+        .from('rooms')
+        .select('id, title, description')
+        .eq('title', roomName)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+
+    if (room == null) {
+      throw PostgrestException(message: 'This room is no longer available.');
     }
+
+    await _db.from('room_members').upsert(
+      {
+        'room_id': room['id'],
+        'user_id': _userId,
+        'role': 'member',
+      },
+      onConflict: 'room_id,user_id',
+      ignoreDuplicates: true,
     );
 
-    print("Adding Current User into Participants collection");
-    await db.collection('rooms').doc(roomName).collection('participants').doc(currentUser!.email).set({
-      "email":currentUser!.email,
-      "isAdmin": true,
-      "isModerator": true,
-      "isSpeaker": true,
-      "isMicOn": false,
-      "isSpeaking": false
-    });
-
-    print("Creating room class");
-    AudioRoom audioRoom = AudioRoom(name: roomName, description: description);
-
-    print("Connecting to LiveKit Room");
-    LiveKitService.joinLiveKitRoom(audioRoom, isAdmin: true);
-
-  }
-
-  static Future deleteRoom({required roomName}) async{
-
-    await ApiService.deleteLkRoom(roomName);
-
-    print("Deleting Room on Firebase Firestore");
-
-    await db.collection('rooms').doc(roomName).delete();
-
-    print("Done");
-
-    Get.off(() => HomeScreen());
-  }
-
-  static Future joinRoom({required roomName, required description}) async{
-
-    Get.defaultDialog(
-      title: "Joining Room...",
-      content: Center(child: CircularProgressIndicator(),)
+    Get.snackbar(
+      'Joined room',
+      'You joined the room. Live voice will be enabled after secure LiveKit token setup.',
+      snackPosition: SnackPosition.BOTTOM,
     );
-
-    print("Adding Current User into Participants collection");
-    await db.collection('rooms').doc(roomName).collection('participants').doc(currentUser!.email).set({
-      "email": currentUser!.email,
-      "isAdmin": false,
-      "isModerator": false,
-      "isSpeaker": true,
-      "isMicOn": false,
-      "isSpeaking": false
-    });
-
-    print("Creating room class");
-    AudioRoom audioRoom = AudioRoom(name: roomName, description: description);
-
-    print("Connecting to LiveKit Room");
-    LiveKitService.joinLiveKitRoom(audioRoom, isAdmin: false);
+    return AudioRoom(
+      name: room['title'] as String,
+      description: (room['description'] ?? '') as String,
+    );
   }
 
-  static Future leaveRoom({required roomName}) async{
-    await db.collection('rooms').doc(roomName).collection('participants').doc(currentUser!.email).delete();
+  static Future leaveRoom({required String roomName}) async {
+    final room = await _db
+        .from('rooms')
+        .select('id')
+        .eq('title', roomName)
+        .limit(1)
+        .maybeSingle();
+
+    if (room == null) return;
+    await _db
+        .from('room_members')
+        .delete()
+        .eq('room_id', room['id'])
+        .eq('user_id', _userId);
   }
 }

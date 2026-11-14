@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audioroom/services/room_service.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/enhanced_room.dart';
@@ -734,7 +735,7 @@ class _CreateEnhancedRoomScreenState extends State<CreateEnhancedRoomScreen>
     }
   }
 
-  void _createRoom() {
+  Future<void> _createRoom() async {
     if (_nameController.text.trim().isEmpty) {
       Get.snackbar(
         'Error',
@@ -787,9 +788,18 @@ class _CreateEnhancedRoomScreenState extends State<CreateEnhancedRoomScreen>
       speakingTimeLimit: _speakingTimeLimit,
     );
 
-    // Here you would typically save the room to your backend
-    print('Creating room: ${room.name}');
-    
+    try {
+      await RoomService.createRoom(
+        roomName: room.name,
+        description: room.description,
+        isPrivate: room.isPasswordProtected ||
+            room.type.toString().split('.').last == 'private',
+      );
+    } catch (error) {
+      Get.snackbar('Could not create room', error.toString());
+      return;
+    }
+
     Get.back(result: room);
     Get.snackbar(
       'Success',

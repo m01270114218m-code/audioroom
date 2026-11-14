@@ -1,34 +1,9 @@
-import 'package:audioroom/utils/constants.dart';
-import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-class JwtService{
-
-  static final currentUserEmail = FirebaseAuth.instance.currentUser!.email;
-
-  static String createJwtToken(String roomName, {required bool isAdmin}){
-    final jwt = JWT(
-
-      // Payload - TODO: This has to be changed for different functions
-      {
-        "video": {
-          "roomCreate": isAdmin,
-          "roomAdmin": isAdmin,
-          "roomList": true,
-          "canPublish": true,
-          "canPublishData": true,
-          "canSubscribe": true,
-          "room": roomName,
-          "roomJoin": true
-        }
-      },
-
-      issuer: lkApiKey,
-      subject: currentUserEmail
-
+/// LiveKit access tokens must be issued by a trusted server/Edge Function.
+/// Signing a LiveKit JWT in the mobile app would expose the API secret.
+class JwtService {
+  static String createJwtToken(String roomName, {required bool isAdmin}) {
+    throw StateError(
+      'LiveKit token generation is server-side only. Configure the LiveKit token Edge Function.',
     );
-
-    String token = jwt.sign(SecretKey(lkSecretKey));
-    return token;
   }
 }

@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'package:audioroom/services/room_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -31,8 +29,6 @@ class _SingleRoomScreenState extends State<SingleRoomScreen> {
 
   bool _isMicOn = false;
 
-  final db = FirebaseFirestore.instance;
-  final currentUser = FirebaseAuth.instance.currentUser;
 
   @override
   void initState() {
@@ -86,8 +82,6 @@ class _SingleRoomScreenState extends State<SingleRoomScreen> {
   void _enableMicrophone() async {
     try {
       await widget.room.localParticipant?.setMicrophoneEnabled(true);
-      await db.collection('rooms').doc(widget.audioRoom.name).collection('participants').doc(currentUser!.email).update(
-          {"isMicOn": true});
     } catch (error) {
       print('could not enable microphone: $error');
     }
@@ -96,8 +90,6 @@ class _SingleRoomScreenState extends State<SingleRoomScreen> {
   void _disableMicrophone() async {
     try {
       await widget.room.localParticipant?.setMicrophoneEnabled(false);
-      await db.collection('rooms').doc(widget.audioRoom.name).collection('participants').doc(currentUser!.email).update(
-          {"isMicOn": false});
     } catch (error) {
       print('could not disable microphone: $error');
     }

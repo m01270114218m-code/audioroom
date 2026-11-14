@@ -1,5 +1,7 @@
 import 'package:audioroom/screens/home_screen.dart';
-import 'package:audioroom/screens/signin_screen.dart';
+import 'package:audioroom/utils/auth_gate.dart';
+import 'package:audioroom/config/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 // import 'package:audioroom/firebase_options.dart';
 // import 'package:audioroom/utils/auth_gate.dart';
 // import 'package:firebase_core/firebase_core.dart';
@@ -9,10 +11,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
-  // Temporarily disabled Firebase for demo
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
   runApp(const MyApp());
 }
 
@@ -23,7 +25,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       title: 'AudioRoom Ninja',
-      home: SignInPage(), // Using SignInPage directly for demo
+      home: const AuthGate(),
       theme: ThemeData.dark().copyWith(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -165,7 +167,7 @@ class MyApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
         ),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           color: Color(0xFF111111),
           elevation: 8,
           shadowColor: Colors.white.withOpacity(0.1),

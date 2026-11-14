@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 
@@ -333,7 +334,7 @@ class GamificationService {
   static int _calculateLevel(int exp) {
     // Level 1: 0-99 XP, Level 2: 100-299 XP, Level 3: 300-599 XP, etc.
     // Formula: level = floor(sqrt(exp/50)) + 1
-    return ((exp / 50).sqrt().floor()) + 1;
+    return (math.sqrt(exp / 50).floor()) + 1;
   }
 
   /// Get experience needed for next level
